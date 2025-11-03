@@ -2,58 +2,36 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "nocodb/nocodb"
-        CONTAINER_NAME = "nocodb-ci"
+        GIT_REPO = 'https://github.com/A-B-USERS/nocodb.git'
+        SSH_KEY = 'ansible-ssh-key'
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Clone Repo') {
             steps {
-                git branch: 'develop',
-                    credentialsId: 'github-token',
-                    url: 'https://github.com/A-B-USERS/nocodb.git'
+                git branch: 'develop', credentialsId: 'github-token', url: "${GIT_REPO}"
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Deploy with Ansible') {
             steps {
-                script {
-                    sh 'docker build -t $DOCKER_IMAGE .'
-                }
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                script {
+                sshagent(['ansible-ssh-key']) {
                     sh '''
-                    docker rm -f $CONTAINER_NAME || true
-                    docker run -d --name $CONTAINER_NAME -p 8080:8080 $DOCKER_IMAGE
+                    ansible-playbook -i /etc/ansible/hosts /root/playbooks/deploy_nocodb.yml
                     '''
                 }
             }
         }
 
-        stage('Test Application') {
+        stage('Deploy to Kubernetes') {
             steps {
-                script {
-                    sh 'curl -f http://localhost:8080 || echo "App not responding yet"'
+                sshagent(['ansible-ssh-key']) {
+                    sh '''
+                    kubectl apply -f /root/k8s/deployment.yml
+                    kubectl apply -f /root/k8s/service.yml
+                    '''
                 }
             }
-        }
-
-        stage('Clean Up') {
-            steps {
-                script {
-                    sh 'docker rm -f $CONTAINER_NAME || true'
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            echo 'Pipeline finished (success or fail).'
         }
     }
 }
