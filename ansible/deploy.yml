@@ -1,0 +1,9 @@
+- name: Deploy NocoDB to Kubernetes
+  hosts: master
+  become: yes
+  tasks:
+    - name: Apply deployment
+      command: kubectl apply -f /root/nocodb/k8s/deployment.yml
+
+    - name: Apply service
+      command: kubectl apply -f /root/nocodb/k8s/service.yml
